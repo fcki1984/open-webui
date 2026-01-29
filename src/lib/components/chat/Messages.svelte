@@ -48,6 +48,7 @@
 	export let showMessage: Function = () => {};
 	export let submitMessage: Function = () => {};
 	export let addMessages: Function = () => {};
+	export let addContextBreak: Function = () => {};
 
 	export let readOnly = false;
 	export let editCodeBlock = true;
@@ -462,6 +463,8 @@
 								{continueResponse}
 								{mergeResponses}
 								{addMessages}
+								{addContextBreak}
+								{contextBreakMessageIds}
 								{triggerScroll}
 								{readOnly}
 								{editCodeBlock}

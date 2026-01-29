@@ -343,6 +343,17 @@ def moa_response_generation_template(
     return template
 
 
+def summarize_generation_template(
+    template: str, messages: list[dict], user: Optional[Any] = None
+) -> str:
+    prompt = get_last_user_message(messages)
+    template = replace_prompt_variable(template, prompt)
+    template = replace_messages_variable(template, messages)
+
+    template = prompt_template(template, user)
+    return template
+
+
 def tools_function_calling_generation_template(template: str, tools_specs: str) -> str:
     template = template.replace("{{TOOLS}}", tools_specs)
     return template

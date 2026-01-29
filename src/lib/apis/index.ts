@@ -1071,6 +1071,43 @@ export const generateMoACompletion = async (
 	return [res, controller];
 };
 
+export const generateSummary = async (
+	token: string = '',
+	model: string,
+	messages: object[],
+	chat_id?: string,
+	stream: boolean = false
+) => {
+	const controller = new AbortController();
+	let error = null;
+
+	const res = await fetch(`${WEBUI_BASE_URL}/api/v1/tasks/summarize/completions`, {
+		signal: controller.signal,
+		method: 'POST',
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`
+		},
+		body: JSON.stringify({
+			model: model,
+			messages: messages,
+			stream: stream,
+			...(chat_id && { chat_id: chat_id })
+		})
+	}).catch((err) => {
+		console.error(err);
+		error = err;
+		return null;
+	});
+
+	if (error) {
+		throw error;
+	}
+
+	return [res, controller];
+};
+
 export const getPipelinesList = async (token: string = '') => {
 	let error = null;
 

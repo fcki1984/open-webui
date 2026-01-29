@@ -928,19 +928,19 @@ body {
 /* Toast 提示样式优化 */
 :root {
 	--toast-offset-x: 0px;
-	--toast-offset-y: 24px;
+	--toast-offset-y: 80px;
 }
 
 [data-sonner-toaster] {
-	--width: min(320px, calc(100vw - 32px)) !important;
+	--width: min(600px, calc(100vw - 32px)) !important;
 	--border-radius: 12px;
 	max-width: calc(100vw - 32px) !important;
 	font-family: inherit;
 }
 
 [data-sonner-toaster] [data-sonner-toast] {
-	width: var(--width) !important;
-	max-width: calc(100vw - 32px) !important;
+	width: max-content !important;
+	max-width: min(600px, calc(100vw - 32px)) !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-styled='true'] {
@@ -1048,7 +1048,16 @@ body {
 @media (max-width: 768px) {
 	:root {
 		--toast-offset-x: 0px;
-		--toast-offset-y: 16px;
+		--toast-offset-y: 70px;
+	}
+
+	[data-sonner-toaster] {
+		--width: calc(100vw - 32px) !important;
+	}
+
+	[data-sonner-toaster] [data-sonner-toast] {
+		width: max-content !important;
+		max-width: calc(100vw - 32px) !important;
 	}
 
 	[data-sonner-toaster][data-x-position="center"] {

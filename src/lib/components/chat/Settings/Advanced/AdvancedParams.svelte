@@ -15,7 +15,7 @@
 	import LightBulbMax from '$lib/components/icons/LightBulbMax.svelte';
 	import LightBulbAuto from '$lib/components/icons/LightBulbAuto.svelte';
 	import { flyAndScale } from '$lib/utils/transitions';
-	import { mobile } from '$lib/stores';
+	import { mobile, settings } from '$lib/stores';
 
 	const i18n = getContext('i18n');
 
@@ -82,6 +82,14 @@
 	export let params = defaultParams;
 	$: if (params) {
 		onChange(params);
+	}
+
+	// 响应式同步 $settings.params.reasoning_effort 的变化（用于快捷控件联动）
+	$: {
+		const settingsEffort = $settings?.params?.reasoning_effort ?? null;
+		if (params.reasoning_effort !== settingsEffort) {
+			params = { ...params, reasoning_effort: settingsEffort };
+		}
 	}
 </script>
 

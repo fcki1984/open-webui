@@ -46,6 +46,8 @@
 	export let mergeResponses: Function;
 
 	export let addMessages: Function;
+	export let addContextBreak: Function;
+	export let contextBreakMessageIds: string[] = [];
 
 	export let triggerScroll: Function;
 
@@ -311,6 +313,8 @@
 											groupedMessageIds[selectedModelIdx].messageIds.length - 1;
 									}}
 									{addMessages}
+									{addContextBreak}
+									{contextBreakMessageIds}
 									{readOnly}
 									{topPadding}
 								/>

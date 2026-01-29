@@ -665,7 +665,7 @@ def stream_chunks_handler(stream: aiohttp.StreamReader):
 
     max_buffer_size = CHAT_STREAM_RESPONSE_CHUNK_MAX_BUFFER_SIZE
     if max_buffer_size is None or max_buffer_size <= 0:
-        return stream
+        max_buffer_size = float("inf")
 
     def normalize_sse_line(line: bytes) -> bytes:
         """
@@ -703,6 +703,11 @@ def stream_chunks_handler(stream: aiohttp.StreamReader):
             return b"data: [DONE]"
         
         return line
+
+    def is_large_image_line(line: bytes) -> bool:
+        if not line:
+            return False
+        return b"data:image/" in line or b"b64_json" in line
 
     async def yield_safe_stream_chunks():
         buffer = b""
@@ -743,16 +748,23 @@ def stream_chunks_handler(stream: aiohttp.StreamReader):
                     if len(line) <= max_buffer_size:
                         skip_mode = False
                         yield normalize_sse_line(line)
+                    elif is_large_image_line(line):
+                        skip_mode = False
+                        yield normalize_sse_line(line)
                     else:
                         yield b"data: {}"
                         yield b"\n"
                 else:
                     # Normal mode: check if line exceeds limit
                     if len(line) > max_buffer_size:
-                        skip_mode = True
-                        yield b"data: {}"
-                        yield b"\n"
-                        log.info(f"Skip mode triggered, line size: {len(line)}")
+                        if is_large_image_line(line):
+                            yield normalize_sse_line(line)
+                            yield b"\n"
+                        else:
+                            skip_mode = True
+                            yield b"data: {}"
+                            yield b"\n"
+                            log.info(f"Skip mode triggered, line size: {len(line)}")
                     else:
                         yield normalize_sse_line(line)
                         yield b"\n"

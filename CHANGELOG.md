@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3-8] - 2026-01-29
+
+### 新增
+
+- 🧠 **模型能力自动推断。** 新增 `model-capabilities.ts`，根据模型名称自动推断视觉、推理、工具调用、联网搜索等能力，减少手动配置。
+- 💾 **Markdown 解析缓存。** 新增 `markdownCache.ts` LRU 缓存机制，避免重复解析相同内容，提升渲染性能。
+- 💡 **亮度图标组件。** 新增多个 LightBulb 亮度图标组件（Auto/High/Low/Max/Medium/Min/Off），用于思考强度等级显示。
+
+### 优化
+
+- ⚡ **长上下文页面加载优化。** 优化长对话的页面加载速度，减少首屏渲染时间。
+- 🔌 **OpenAI API 兼容性增强。** 大幅增强 `openai.py`，支持 Responses API 的 `store: false` 参数，让思考链正常显示；优化上游超时（524）错误提示。
+- 🤖 **Gemini 思考链支持。** 增强 Gemini 路由，完善思考链显示和 Token 统计。
+- 🛡️ **中间件增强。** 大幅改进请求处理中间件，提升稳定性和错误处理能力。
+- 🎨 **管理员设置页面优化。** 重构 Documents、General、WebSearch 等多个设置页面的 UI 布局。
+- 🔤 **代码字体支持。** 新增 FiraCode、JetBrainsMono 等编程字体。
+
+### 修复
+
+- 🔧 **流式传输稳定性。** 优化流式传输，防止因网络问题导致的响应截断。
+- 🐛 **启动性能提升。** 优化启动速度，降低内存占用。
+
 ## [0.7.3-7] - 2026-01-23
 
 ### 新增

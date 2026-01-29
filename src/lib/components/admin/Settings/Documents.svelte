@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Writable } from 'svelte/store';
 	import { toast } from 'svelte-sonner';
+	import { slide } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
 
 	import { onMount, getContext, createEventDispatcher } from 'svelte';
 
@@ -29,10 +31,21 @@
 	import Switch from '$lib/components/common/Switch.svelte';
 	import Textarea from '$lib/components/common/Textarea.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import ChevronDown from '$lib/components/icons/ChevronDown.svelte';
 
 	import { ragConfigCache, retrievalEmbeddingCache } from '$lib/stores';
 
 	const i18n: Writable<any> = getContext('i18n');
+
+	// 折叠状态
+	let expandedSections = {
+		general: true,
+		embedding: false,
+		retrieval: false,
+		files: false,
+		integration: false,
+		danger: false
+	};
 
 	let updateEmbeddingModelLoading = false;
 	let updateRerankingModelLoading = false;
@@ -357,35 +370,45 @@
 	}}
 >
 	{#if RAGConfig}
-		<div class="space-y-4 overflow-y-scroll scrollbar-hidden h-full pr-2">
-			<div class="max-w-5xl mx-auto">
-				<div class="mb-4">
-					<div class="mt-0.5 mb-2.5 text-base font-medium">{$i18n.t('General')}</div>
-					<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
-					<div
-						class="bg-gray-50 dark:bg-gray-850 rounded-lg p-5 border border-gray-100 dark:border-gray-800"
-					>
-						<div class="mb-2.5 flex flex-col w-full justify-between">
-							<div class="flex w-full justify-between mb-1">
-								<div class="self-center text-xs font-medium">
-									{$i18n.t('Content Extraction Engine')}
-								</div>
-								<div class="">
-									<select
-										class="dark:bg-gray-900 w-fit pr-8 rounded-lg px-2 py-1 text-sm bg-transparent outline-none focus:ring-0 focus:border-gray-300 border-none text-right cursor-pointer"
-										bind:value={RAGConfig.CONTENT_EXTRACTION_ENGINE}
-									>
-										<option value="">{$i18n.t('Default')}</option>
-										<option value="external">{$i18n.t('External')}</option>
-										<option value="tika">{$i18n.t('Tika')}</option>
-										<option value="docling">{$i18n.t('Docling')}</option>
-										<option value="datalab_marker">{$i18n.t('Datalab Marker API')}</option>
-										<option value="document_intelligence">{$i18n.t('Document Intelligence')}</option
-										>
-										<option value="mistral_ocr">{$i18n.t('Mistral OCR')}</option>
-										<option value="mineru">{$i18n.t('MinerU')}</option>
-									</select>
-								</div>
+		<div class="space-y-3 overflow-y-scroll scrollbar-hidden h-full pr-2">
+			<!-- 通用设置 General -->
+			<div class="max-w-5xl mx-auto rounded-xl border border-gray-200 dark:border-gray-800">
+				<button
+					type="button"
+					class="w-full flex items-center justify-between px-5 py-4 text-left"
+					on:click={() => (expandedSections.general = !expandedSections.general)}
+				>
+					<div class="flex items-center gap-3">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-gray-500">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+						</svg>
+						<span class="text-base font-medium text-gray-900 dark:text-gray-100">{$i18n.t('General')}</span>
+					</div>
+					<div class="transform transition-transform duration-200 {expandedSections.general ? 'rotate-180' : ''}">
+						<ChevronDown className="size-5 text-gray-400" />
+					</div>
+				</button>
+
+				{#if expandedSections.general}
+					<div transition:slide={{ duration: 200, easing: quintOut }} class="px-5 pb-5 space-y-4">
+						<!-- 内容提取引擎 -->
+						<div class="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-800">
+							<div class="flex items-center justify-between mb-3">
+								<div class="text-sm font-medium">{$i18n.t('Content Extraction Engine')}</div>
+								<select
+									class="dark:bg-gray-850 w-fit pr-8 rounded-lg px-2 py-1.5 text-sm bg-gray-50 outline-none border border-gray-200 dark:border-gray-700 text-right cursor-pointer"
+									bind:value={RAGConfig.CONTENT_EXTRACTION_ENGINE}
+								>
+									<option value="">{$i18n.t('Default')}</option>
+									<option value="external">{$i18n.t('External')}</option>
+									<option value="tika">{$i18n.t('Tika')}</option>
+									<option value="docling">{$i18n.t('Docling')}</option>
+									<option value="datalab_marker">{$i18n.t('Datalab Marker API')}</option>
+									<option value="document_intelligence">{$i18n.t('Document Intelligence')}</option>
+									<option value="mistral_ocr">{$i18n.t('Mistral OCR')}</option>
+									<option value="mineru">{$i18n.t('MinerU')}</option>
+								</select>
 							</div>
 
 							{#if RAGConfig.CONTENT_EXTRACTION_ENGINE === ''}
@@ -933,67 +956,76 @@
 							{/if}
 						{/if}
 					</div>
-				</div>
+				{/if}
+			</div>
 
-				{#if !RAGConfig.BYPASS_EMBEDDING_AND_RETRIEVAL}
-					<div class="mb-4">
-						<div class="mt-0.5 mb-2.5 text-base font-medium">{$i18n.t('Embedding')}</div>
-						<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
-						<div
-							class="bg-gray-50 dark:bg-gray-850 rounded-lg p-5 border border-gray-100 dark:border-gray-800"
-						>
-							<div class="  mb-2.5 flex flex-col w-full justify-between">
-								<div class="flex w-full justify-between">
-									<div class=" self-center text-xs font-medium">
-										{$i18n.t('Embedding Model Engine')}
-									</div>
-									<div class="flex items-center relative">
-										<select
-											class="dark:bg-gray-900 w-fit pr-8 rounded-lg px-2 py-1 text-sm bg-transparent outline-none focus:ring-0 focus:border-gray-300 border-none text-right cursor-pointer"
-											bind:value={RAG_EMBEDDING_ENGINE}
-											placeholder={$i18n.t('Select an embedding model engine')}
-											on:change={(e) => {
-												const target = e.target as HTMLSelectElement;
-												if (target.value === 'ollama') {
-													RAG_EMBEDDING_MODEL = '';
-												} else if (target.value === 'openai') {
-													RAG_EMBEDDING_MODEL = 'text-embedding-3-small';
-												} else if (target.value === 'azure_openai') {
-													RAG_EMBEDDING_MODEL = 'text-embedding-3-small';
-												} else if (target.value === '') {
-													RAG_EMBEDDING_MODEL = 'sentence-transformers/all-MiniLM-L6-v2';
-												}
-											}}
-										>
-											<option value="">{$i18n.t('Default (SentenceTransformers)')}</option>
-											<option value="ollama">{$i18n.t('Ollama')}</option>
-											<option value="openai">{$i18n.t('OpenAI')}</option>
-											<option value="azure_openai">{$i18n.t('Azure OpenAI')}</option>
-										</select>
-									</div>
+			{#if !RAGConfig.BYPASS_EMBEDDING_AND_RETRIEVAL}
+				<!-- 嵌入模型 Embedding -->
+				<div class="max-w-5xl mx-auto rounded-xl border border-gray-200 dark:border-gray-800">
+					<button
+						type="button"
+						class="w-full flex items-center justify-between px-5 py-4 text-left"
+						on:click={() => (expandedSections.embedding = !expandedSections.embedding)}
+					>
+						<div class="flex items-center gap-3">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-gray-500">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+							</svg>
+							<span class="text-base font-medium text-gray-900 dark:text-gray-100">{$i18n.t('Embedding')}</span>
+						</div>
+						<div class="transform transition-transform duration-200 {expandedSections.embedding ? 'rotate-180' : ''}">
+							<ChevronDown className="size-5 text-gray-400" />
+						</div>
+					</button>
+
+					{#if expandedSections.embedding}
+						<div transition:slide={{ duration: 200, easing: quintOut }} class="px-5 pb-5 space-y-4">
+							<!-- 嵌入引擎选择 -->
+							<div class="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-800">
+								<div class="flex items-center justify-between mb-3">
+									<div class="text-sm font-medium">{$i18n.t('Embedding Model Engine')}</div>
+									<select
+										class="dark:bg-gray-850 w-fit pr-8 rounded-lg px-2 py-1.5 text-sm bg-gray-50 outline-none border border-gray-200 dark:border-gray-700 text-right cursor-pointer"
+										bind:value={RAG_EMBEDDING_ENGINE}
+										placeholder={$i18n.t('Select an embedding model engine')}
+										on:change={(e) => {
+											const target = e.target as HTMLSelectElement;
+											if (target.value === 'ollama') {
+												RAG_EMBEDDING_MODEL = '';
+											} else if (target.value === 'openai') {
+												RAG_EMBEDDING_MODEL = 'text-embedding-3-small';
+											} else if (target.value === 'azure_openai') {
+												RAG_EMBEDDING_MODEL = 'text-embedding-3-small';
+											} else if (target.value === '') {
+												RAG_EMBEDDING_MODEL = 'sentence-transformers/all-MiniLM-L6-v2';
+											}
+										}}
+									>
+										<option value="">{$i18n.t('Default (SentenceTransformers)')}</option>
+										<option value="ollama">{$i18n.t('Ollama')}</option>
+										<option value="openai">{$i18n.t('OpenAI')}</option>
+										<option value="azure_openai">{$i18n.t('Azure OpenAI')}</option>
+									</select>
 								</div>
 
 								{#if RAG_EMBEDDING_ENGINE === 'openai'}
-									<hr class="border-gray-100 dark:border-gray-800 my-3" />
-
-									<div class="flex flex-col gap-3">
-										<div class="w-full">
-											<div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-												{$i18n.t('API Base URL')}
+									<div class="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+										<div class="flex w-full justify-between items-center">
+											<div class="text-xs text-gray-500">{$i18n.t('API Base URL')}</div>
+											<div class="w-1/2">
+												<input
+													class="w-full text-sm bg-transparent outline-hidden text-right"
+													placeholder={$i18n.t('API Base URL')}
+													bind:value={OpenAIUrl}
+													required
+												/>
 											</div>
-											<input
-												class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-												placeholder={$i18n.t('API Base URL')}
-												bind:value={OpenAIUrl}
-												required
-											/>
 										</div>
-										<div class="w-full">
-											<div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-												{$i18n.t('API Key')}
-											</div>
-											<div class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 transition flex items-center">
+										<div class="flex w-full justify-between items-center">
+											<div class="text-xs text-gray-500">{$i18n.t('API Key')}</div>
+											<div class="w-1/2">
 												<SensitiveInput
+													inputClassName="text-right w-full text-sm"
 													placeholder={$i18n.t('API Key')}
 													bind:value={OpenAIKey}
 													required={false}
@@ -1002,26 +1034,23 @@
 										</div>
 									</div>
 								{:else if RAG_EMBEDDING_ENGINE === 'ollama'}
-									<hr class="border-gray-100 dark:border-gray-800 my-3" />
-
-									<div class="flex flex-col gap-3">
-										<div class="w-full">
-											<div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-												{$i18n.t('API Base URL')}
+									<div class="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+										<div class="flex w-full justify-between items-center">
+											<div class="text-xs text-gray-500">{$i18n.t('API Base URL')}</div>
+											<div class="w-1/2">
+												<input
+													class="w-full text-sm bg-transparent outline-hidden text-right"
+													placeholder={$i18n.t('API Base URL')}
+													bind:value={OllamaUrl}
+													required
+												/>
 											</div>
-											<input
-												class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-												placeholder={$i18n.t('API Base URL')}
-												bind:value={OllamaUrl}
-												required
-											/>
 										</div>
-										<div class="w-full">
-											<div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-												{$i18n.t('API Key')}
-											</div>
-											<div class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 transition flex items-center">
+										<div class="flex w-full justify-between items-center">
+											<div class="text-xs text-gray-500">{$i18n.t('API Key')}</div>
+											<div class="w-1/2">
 												<SensitiveInput
+													inputClassName="text-right w-full text-sm"
 													placeholder={$i18n.t('API Key')}
 													bind:value={OllamaKey}
 													required={false}
@@ -1030,47 +1059,41 @@
 										</div>
 									</div>
 								{:else if RAG_EMBEDDING_ENGINE === 'azure_openai'}
-									<hr class="border-gray-100 dark:border-gray-800 my-3" />
-
-									<div class="flex flex-col gap-3">
-										<div class="w-full">
-											<div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-												{$i18n.t('API Base URL')}
+									<div class="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+										<div class="flex w-full justify-between items-center">
+											<div class="text-xs text-gray-500">{$i18n.t('API Base URL')}</div>
+											<div class="w-1/2">
+												<input
+													class="w-full text-sm bg-transparent outline-hidden text-right"
+													placeholder={$i18n.t('API Base URL')}
+													bind:value={AzureOpenAIUrl}
+													required
+												/>
 											</div>
-											<input
-												class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-												placeholder={$i18n.t('API Base URL')}
-												bind:value={AzureOpenAIUrl}
-												required
-											/>
 										</div>
-										<div class="w-full">
-											<div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-												{$i18n.t('API Key')}
-											</div>
-											<div class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 transition flex items-center">
+										<div class="flex w-full justify-between items-center">
+											<div class="text-xs text-gray-500">{$i18n.t('API Key')}</div>
+											<div class="w-1/2">
 												<SensitiveInput
+													inputClassName="text-right w-full text-sm"
 													placeholder={$i18n.t('API Key')}
 													bind:value={AzureOpenAIKey}
 												/>
 											</div>
 										</div>
-										<div class="w-full">
-											<div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-												{$i18n.t('Version')}
+										<div class="flex w-full justify-between items-center">
+											<div class="text-xs text-gray-500">{$i18n.t('Version')}</div>
+											<div class="w-1/2">
+												<input
+													class="w-full text-sm bg-transparent outline-hidden text-right"
+													placeholder={$i18n.t('Version')}
+													bind:value={AzureOpenAIVersion}
+													required
+												/>
 											</div>
-											<input
-												class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-												placeholder={$i18n.t('Version')}
-												bind:value={AzureOpenAIVersion}
-												required
-											/>
 										</div>
 									</div>
 								{/if}
-							</div>
-
-							<div class="  mb-2.5 flex flex-col w-full">
 								<div class=" mb-1 text-xs font-medium">{$i18n.t('Embedding Model')}</div>
 
 								<div class="">
@@ -1172,30 +1195,40 @@
 								</div>
 							{/if}
 						</div>
-					</div>
+					{/if}
+				</div>
 
-					<div class="mb-4">
-						<div class="mt-0.5 mb-2.5 text-base font-medium">{$i18n.t('Retrieval')}</div>
-						<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
-						<div
-							class="bg-gray-50 dark:bg-gray-850 rounded-lg p-5 border border-gray-100 dark:border-gray-800"
-						>
-							<div class="  mb-2.5 flex w-full justify-between">
-								<div class=" self-center text-xs font-medium">{$i18n.t('Full Context Mode')}</div>
-								<div class="flex items-center relative">
+				<!-- 检索设置 Retrieval -->
+				<div class="max-w-5xl mx-auto rounded-xl border border-gray-200 dark:border-gray-800">
+					<button
+						type="button"
+						class="w-full flex items-center justify-between px-5 py-4 text-left"
+						on:click={() => (expandedSections.retrieval = !expandedSections.retrieval)}
+					>
+						<div class="flex items-center gap-3">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-gray-500">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+							</svg>
+							<span class="text-base font-medium text-gray-900 dark:text-gray-100">{$i18n.t('Retrieval')}</span>
+						</div>
+						<div class="transform transition-transform duration-200 {expandedSections.retrieval ? 'rotate-180' : ''}">
+							<ChevronDown className="size-5 text-gray-400" />
+						</div>
+					</button>
+
+					{#if expandedSections.retrieval}
+						<div transition:slide={{ duration: 200, easing: quintOut }} class="px-5 pb-5 space-y-4">
+							<div class="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-800">
+								<div class="flex items-center justify-between mb-3">
+									<div class="text-sm font-medium">{$i18n.t('Full Context Mode')}</div>
 									<Tooltip
 										content={RAGConfig.RAG_FULL_CONTEXT
-											? $i18n.t(
-													'Inject the entire content as context for comprehensive processing, this is recommended for complex queries.'
-												)
-											: $i18n.t(
-													'Default to segmented retrieval for focused and relevant content extraction, this is recommended for most cases.'
-												)}
+											? $i18n.t('Inject the entire content as context for comprehensive processing, this is recommended for complex queries.')
+											: $i18n.t('Default to segmented retrieval for focused and relevant content extraction, this is recommended for most cases.')}
 									>
 										<Switch bind:state={RAGConfig.RAG_FULL_CONTEXT} />
 									</Tooltip>
 								</div>
-							</div>
 
 							{#if !RAGConfig.RAG_FULL_CONTEXT}
 								<hr class="border-gray-100 dark:border-gray-800 my-2.5" />
@@ -1432,8 +1465,6 @@
 								{/if}
 							{/if}
 
-							<hr class="border-gray-100 dark:border-gray-800 my-2.5" />
-
 							<div class="  mb-2.5 flex flex-col w-full justify-between">
 								<div class=" mb-1 text-xs font-medium">{$i18n.t('RAG Template')}</div>
 								<div class="flex w-full items-center relative">
@@ -1453,201 +1484,232 @@
 									</Tooltip>
 								</div>
 							</div>
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- 文件设置 Files -->
+			<div class="max-w-5xl mx-auto rounded-xl border border-gray-200 dark:border-gray-800">
+				<button
+					type="button"
+					class="w-full flex items-center justify-between px-5 py-4 text-left"
+					on:click={() => (expandedSections.files = !expandedSections.files)}
+				>
+					<div class="flex items-center gap-3">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-gray-500">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+						</svg>
+						<span class="text-base font-medium text-gray-900 dark:text-gray-100">{$i18n.t('Files')}</span>
+					</div>
+					<div class="transform transition-transform duration-200 {expandedSections.files ? 'rotate-180' : ''}">
+						<ChevronDown className="size-5 text-gray-400" />
+					</div>
+				</button>
+
+				{#if expandedSections.files}
+					<div transition:slide={{ duration: 200, easing: quintOut }} class="px-5 pb-5 space-y-4">
+						<div class="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-800">
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div class="md:col-span-2">
+									<div class="text-xs font-medium text-gray-500 mb-1.5">
+										{$i18n.t('Allowed File Extensions')}
+									</div>
+									<Tooltip
+										content={$i18n.t('Allowed file extensions for upload. Separate multiple extensions with commas. Leave empty for all file types.')}
+										placement="top-start"
+									>
+										<input
+											class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:bg-gray-850 dark:text-gray-300 border border-gray-200 dark:border-gray-700 outline-none"
+											type="text"
+											placeholder={$i18n.t('e.g. pdf, docx, txt')}
+											bind:value={RAGConfig.ALLOWED_FILE_EXTENSIONS}
+											autocomplete="off"
+										/>
+									</Tooltip>
+								</div>
+
+								<div>
+									<div class="text-xs font-medium text-gray-500 mb-1.5">
+										{$i18n.t('Max Upload Size')}
+									</div>
+									<Tooltip
+										content={$i18n.t('The maximum file size in MB. If the file size exceeds this limit, the file will not be uploaded.')}
+										placement="top-start"
+									>
+										<input
+											class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:bg-gray-850 dark:text-gray-300 border border-gray-200 dark:border-gray-700 outline-none"
+											type="number"
+											placeholder={$i18n.t('Leave empty for unlimited')}
+											bind:value={RAGConfig.FILE_MAX_SIZE}
+											autocomplete="off"
+											min="0"
+										/>
+									</Tooltip>
+								</div>
+
+								<div>
+									<div class="text-xs font-medium text-gray-500 mb-1.5">
+										{$i18n.t('Max Upload Count')}
+									</div>
+									<Tooltip
+										content={$i18n.t('The maximum number of files that can be used at once in chat. If the number of files exceeds this limit, the files will not be uploaded.')}
+										placement="top-start"
+									>
+										<input
+											class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:bg-gray-850 dark:text-gray-300 border border-gray-200 dark:border-gray-700 outline-none"
+											type="number"
+											placeholder={$i18n.t('Leave empty for unlimited')}
+											bind:value={RAGConfig.FILE_MAX_COUNT}
+											autocomplete="off"
+											min="0"
+										/>
+									</Tooltip>
+								</div>
+
+								<div>
+									<div class="text-xs font-medium text-gray-500 mb-1.5">
+										{$i18n.t('Image Compression Width')}
+									</div>
+									<Tooltip
+										content={$i18n.t('The width in pixels to compress images to. Leave empty for no compression.')}
+										placement="top-start"
+									>
+										<input
+											class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:bg-gray-850 dark:text-gray-300 border border-gray-200 dark:border-gray-700 outline-none"
+											type="number"
+											placeholder={$i18n.t('Leave empty for no compression')}
+											bind:value={RAGConfig.FILE_IMAGE_COMPRESSION_WIDTH}
+											autocomplete="off"
+											min="0"
+										/>
+									</Tooltip>
+								</div>
+
+								<div>
+									<div class="text-xs font-medium text-gray-500 mb-1.5">
+										{$i18n.t('Image Compression Height')}
+									</div>
+									<Tooltip
+										content={$i18n.t('The height in pixels to compress images to. Leave empty for no compression.')}
+										placement="top-start"
+									>
+										<input
+											class="w-full rounded-lg py-2 px-4 text-sm bg-gray-50 dark:bg-gray-850 dark:text-gray-300 border border-gray-200 dark:border-gray-700 outline-none"
+											type="number"
+											placeholder={$i18n.t('Leave empty for no compression')}
+											bind:value={RAGConfig.FILE_IMAGE_COMPRESSION_HEIGHT}
+											autocomplete="off"
+											min="0"
+										/>
+									</Tooltip>
+								</div>
+							</div>
 						</div>
 					</div>
 				{/if}
+			</div>
 
-				<div class="mb-4">
-					<div class="mt-0.5 mb-2.5 text-base font-medium">{$i18n.t('Files')}</div>
-					<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
-					<div
-						class="bg-gray-50 dark:bg-gray-850 rounded-lg p-5 border border-gray-100 dark:border-gray-800"
-					>
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-							<div class="md:col-span-2">
-								<div class="text-xs font-medium text-gray-500 mb-1.5">
-									{$i18n.t('Allowed File Extensions')}
-								</div>
-								<Tooltip
-									content={$i18n.t(
-										'Allowed file extensions for upload. Separate multiple extensions with commas. Leave empty for all file types.'
-									)}
-									placement="top-start"
-								>
-									<input
-										class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-										type="text"
-										placeholder={$i18n.t('e.g. pdf, docx, txt')}
-										bind:value={RAGConfig.ALLOWED_FILE_EXTENSIONS}
-										autocomplete="off"
-									/>
-								</Tooltip>
-							</div>
+			<!-- 集成 Integration -->
+			<div class="max-w-5xl mx-auto rounded-xl border border-gray-200 dark:border-gray-800">
+				<button
+					type="button"
+					class="w-full flex items-center justify-between px-5 py-4 text-left"
+					on:click={() => (expandedSections.integration = !expandedSections.integration)}
+				>
+					<div class="flex items-center gap-3">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-gray-500">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+						</svg>
+						<span class="text-base font-medium text-gray-900 dark:text-gray-100">{$i18n.t('Integration')}</span>
+					</div>
+					<div class="transform transition-transform duration-200 {expandedSections.integration ? 'rotate-180' : ''}">
+						<ChevronDown className="size-5 text-gray-400" />
+					</div>
+				</button>
 
-							<div>
-								<div class="text-xs font-medium text-gray-500 mb-1.5">
-									{$i18n.t('Max Upload Size')}
+				{#if expandedSections.integration}
+					<div transition:slide={{ duration: 200, easing: quintOut }} class="px-5 pb-5 space-y-4">
+						<div class="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-800">
+							<div class="space-y-3">
+								<div class="flex items-center justify-between">
+									<div class="text-sm font-medium">{$i18n.t('Google Drive')}</div>
+									<Switch bind:state={RAGConfig.ENABLE_GOOGLE_DRIVE_INTEGRATION} />
 								</div>
-								<Tooltip
-									content={$i18n.t(
-										'The maximum file size in MB. If the file size exceeds this limit, the file will not be uploaded.'
-									)}
-									placement="top-start"
-								>
-									<input
-										class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-										type="number"
-										placeholder={$i18n.t('Leave empty for unlimited')}
-										bind:value={RAGConfig.FILE_MAX_SIZE}
-										autocomplete="off"
-										min="0"
-									/>
-								</Tooltip>
-							</div>
-
-							<div>
-								<div class="text-xs font-medium text-gray-500 mb-1.5">
-									{$i18n.t('Max Upload Count')}
+								<div class="flex items-center justify-between">
+									<div class="text-sm font-medium">{$i18n.t('OneDrive')}</div>
+									<Switch bind:state={RAGConfig.ENABLE_ONEDRIVE_INTEGRATION} />
 								</div>
-								<Tooltip
-									content={$i18n.t(
-										'The maximum number of files that can be used at once in chat. If the number of files exceeds this limit, the files will not be uploaded.'
-									)}
-									placement="top-start"
-								>
-									<input
-										class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-										type="number"
-										placeholder={$i18n.t('Leave empty for unlimited')}
-										bind:value={RAGConfig.FILE_MAX_COUNT}
-										autocomplete="off"
-										min="0"
-									/>
-								</Tooltip>
-							</div>
-
-							<div>
-								<div class="text-xs font-medium text-gray-500 mb-1.5">
-									{$i18n.t('Image Compression Width')}
-								</div>
-								<Tooltip
-									content={$i18n.t(
-										'The width in pixels to compress images to. Leave empty for no compression.'
-									)}
-									placement="top-start"
-								>
-									<input
-										class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-										type="number"
-										placeholder={$i18n.t('Leave empty for no compression')}
-										bind:value={RAGConfig.FILE_IMAGE_COMPRESSION_WIDTH}
-										autocomplete="off"
-										min="0"
-									/>
-								</Tooltip>
-							</div>
-
-							<div>
-								<div class="text-xs font-medium text-gray-500 mb-1.5">
-									{$i18n.t('Image Compression Height')}
-								</div>
-								<Tooltip
-									content={$i18n.t(
-										'The height in pixels to compress images to. Leave empty for no compression.'
-									)}
-									placement="top-start"
-								>
-									<input
-										class="w-full rounded-lg py-2 px-4 text-sm bg-white dark:bg-gray-900 dark:text-gray-300 border border-gray-100 dark:border-gray-800 outline-none focus:border-gray-300 dark:focus:border-gray-700 transition"
-										type="number"
-										placeholder={$i18n.t('Leave empty for no compression')}
-										bind:value={RAGConfig.FILE_IMAGE_COMPRESSION_HEIGHT}
-										autocomplete="off"
-										min="0"
-									/>
-								</Tooltip>
 							</div>
 						</div>
 					</div>
-				</div>
+				{/if}
+			</div>
 
-				<div class="mb-4">
-					<div class="mt-0.5 mb-2.5 text-base font-medium">{$i18n.t('Integration')}</div>
-					<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
-					<div
-						class="bg-gray-50 dark:bg-gray-850 rounded-lg p-5 border border-gray-100 dark:border-gray-800"
-					>
-						<div class="flex flex-col gap-4">
-							<div class="flex items-center justify-between">
-								<div class="text-sm font-medium">{$i18n.t('Google Drive')}</div>
-								<Switch bind:state={RAGConfig.ENABLE_GOOGLE_DRIVE_INTEGRATION} />
-							</div>
+			<!-- 危险区域 Danger Zone -->
+			<div class="max-w-5xl mx-auto rounded-xl border border-red-200 dark:border-red-900/50">
+				<button
+					type="button"
+					class="w-full flex items-center justify-between px-5 py-4 text-left"
+					on:click={() => (expandedSections.danger = !expandedSections.danger)}
+				>
+					<div class="flex items-center gap-3">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-red-500">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+						</svg>
+						<span class="text-base font-medium text-red-600 dark:text-red-400">{$i18n.t('Danger Zone')}</span>
+					</div>
+					<div class="transform transition-transform duration-200 {expandedSections.danger ? 'rotate-180' : ''}">
+						<ChevronDown className="size-5 text-gray-400" />
+					</div>
+				</button>
 
-							<div class="flex items-center justify-between">
-								<div class="text-sm font-medium">{$i18n.t('OneDrive')}</div>
-								<Switch bind:state={RAGConfig.ENABLE_ONEDRIVE_INTEGRATION} />
+				{#if expandedSections.danger}
+					<div transition:slide={{ duration: 200, easing: quintOut }} class="px-5 pb-5 space-y-4">
+						<div class="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-800">
+							<div class="space-y-3">
+								<div class="flex items-center justify-between">
+									<div class="text-sm font-medium">{$i18n.t('Reset Upload Directory')}</div>
+									<button
+										class="px-3.5 py-1.5 font-medium text-xs bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 transition rounded-lg"
+										type="button"
+										on:click={() => { showResetUploadDirConfirm = true; }}
+									>
+										{$i18n.t('Reset')}
+									</button>
+								</div>
+
+								<div class="flex items-center justify-between">
+									<div class="text-sm font-medium">{$i18n.t('Reset Vector Storage/Knowledge')}</div>
+									<button
+										class="px-3.5 py-1.5 font-medium text-xs bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 transition rounded-lg"
+										type="button"
+										on:click={() => { showResetConfirm = true; }}
+									>
+										{$i18n.t('Reset')}
+									</button>
+								</div>
+
+								<div class="flex items-center justify-between">
+									<div class="text-sm font-medium">{$i18n.t('Reindex Knowledge Base Vectors')}</div>
+									<button
+										class="px-3.5 py-1.5 font-medium text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-850 dark:hover:bg-gray-800 dark:text-gray-100 transition rounded-lg"
+										type="button"
+										on:click={() => { showReindexConfirm = true; }}
+									>
+										{$i18n.t('Reindex')}
+									</button>
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
-
-				<div class="mb-4">
-					<div class="mt-0.5 mb-2.5 text-base font-medium">{$i18n.t('Danger Zone')}</div>
-					<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
-					<div
-						class="bg-gray-50 dark:bg-gray-850 rounded-lg p-5 border border-gray-100 dark:border-gray-800"
-					>
-						<div class="flex flex-col gap-3">
-							<div class="flex items-center justify-between">
-								<div class="text-sm font-medium">{$i18n.t('Reset Upload Directory')}</div>
-								<button
-									class="px-3.5 py-1.5 font-medium text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-850 dark:hover:bg-gray-800 dark:text-gray-100 transition rounded-lg"
-									type="button"
-									on:click={() => {
-										showResetUploadDirConfirm = true;
-									}}
-								>
-									{$i18n.t('Reset')}
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between">
-								<div class="text-sm font-medium">
-									{$i18n.t('Reset Vector Storage/Knowledge')}
-								</div>
-								<button
-									class="px-3.5 py-1.5 font-medium text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-850 dark:hover:bg-gray-800 dark:text-gray-100 transition rounded-lg"
-									type="button"
-									on:click={() => {
-										showResetConfirm = true;
-									}}
-								>
-									{$i18n.t('Reset')}
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between">
-								<div class="text-sm font-medium">
-									{$i18n.t('Reindex Knowledge Base Vectors')}
-								</div>
-								<button
-									class="px-3.5 py-1.5 font-medium text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-850 dark:hover:bg-gray-800 dark:text-gray-100 transition rounded-lg"
-									type="button"
-									on:click={() => {
-										showReindexConfirm = true;
-									}}
-								>
-									{$i18n.t('Reindex')}
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
+				{/if}
 			</div>
 		</div>
 		<div class="flex justify-end pt-3 text-sm font-medium">
 			<button
-				class="px-4 py-2 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full"
+				class="px-3.5 py-1.5 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full"
 				type="submit"
 			>
 				{$i18n.t('Save')}

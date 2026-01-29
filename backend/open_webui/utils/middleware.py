@@ -978,24 +978,114 @@ def get_images_from_messages(message_list):
 
 
 def get_image_urls(delta_images, request, metadata, user) -> list[str]:
-    if not isinstance(delta_images, list):
+    if delta_images is None:
+        return []
+
+    if isinstance(delta_images, list):
+        items = delta_images
+    elif isinstance(delta_images, (dict, str)):
+        items = [delta_images]
+    else:
         return []
 
     image_urls = []
-    for img in delta_images:
-        if not isinstance(img, dict) or img.get("type") != "image_url":
-            continue
+    for img in items:
+        url = None
+        if isinstance(img, str):
+            if img.startswith("data:image/") or img.startswith("http"):
+                url = img
+        elif isinstance(img, dict):
+            image_url_value = img.get("image_url")
+            if isinstance(image_url_value, dict):
+                url = image_url_value.get("url")
+            elif isinstance(image_url_value, str):
+                url = image_url_value
 
-        url = img.get("image_url", {}).get("url")
+            if not url:
+                url = img.get("url")
+
+            if not url and isinstance(img.get("image"), str):
+                url = img.get("image")
+
+            image_value = img.get("image")
+            if not url and isinstance(image_value, dict):
+                nested_urls = get_image_urls(image_value, request, metadata, user)
+                if nested_urls:
+                    image_urls.extend(nested_urls)
+                    continue
+
+            if not url and img.get("b64_json"):
+                url = f"data:image/png;base64,{img.get('b64_json')}"
+
+            if not url:
+                data_value = img.get("data")
+                mime_type = img.get("mime_type") or img.get("mimeType")
+                if isinstance(data_value, str) and isinstance(mime_type, str):
+                    if mime_type.startswith("image/"):
+                        url = f"data:{mime_type};base64,{data_value}"
+
+            if not url:
+                source_value = img.get("source")
+                if isinstance(source_value, dict):
+                    data_value = source_value.get("data")
+                    mime_type = (
+                        source_value.get("media_type")
+                        or source_value.get("mime_type")
+                        or source_value.get("mimeType")
+                    )
+                    if isinstance(data_value, str) and isinstance(mime_type, str):
+                        if mime_type.startswith("image/"):
+                            url = f"data:{mime_type};base64,{data_value}"
+
+            if not url:
+                inline_data = img.get("inline_data")
+                if isinstance(inline_data, dict):
+                    data_value = inline_data.get("data")
+                    mime_type = (
+                        inline_data.get("mime_type")
+                        or inline_data.get("mimeType")
+                    )
+                    if isinstance(data_value, str) and isinstance(mime_type, str):
+                        if mime_type.startswith("image/"):
+                            url = f"data:{mime_type};base64,{data_value}"
+
         if not url:
             continue
 
-        if url.startswith("data:image/png;base64"):
+        if url.startswith("data:image/"):
             url = get_image_url_from_base64(request, url, metadata, user)
 
-        image_urls.append(url)
+        if url:
+            image_urls.append(url)
 
     return image_urls
+
+
+def _stringify_stream_content(value) -> str:
+    if isinstance(value, list):
+        parts = []
+        for item in value:
+            if isinstance(item, dict):
+                item_type = item.get("type")
+                if item_type in ("text", "output_text", "input_text", "assistant_text"):
+                    parts.append(item.get("text") or item.get("content") or "")
+                elif item_type in (None, ""):
+                    parts.append(item.get("text") or item.get("content") or "")
+            elif isinstance(item, str):
+                parts.append(item)
+        return "".join(parts)
+    if isinstance(value, dict):
+        return value.get("text") or value.get("content") or value.get("value") or ""
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def _extract_base64_images_from_markdown(content: str) -> list[str]:
+    if not isinstance(content, str) or "data:image/" not in content:
+        return []
+    pattern = re.compile(r"!\\[[^\\]]*\\]\\((data:image/[^)]+)\\)", re.IGNORECASE)
+    return [match.group(1) for match in pattern.finditer(content)]
 
 
 def add_file_context(messages: list, chat_id: str, user) -> list:
@@ -3354,6 +3444,67 @@ async def process_chat_response(
 
                                     # SAFEGUARD: Check choices[0] is a valid dict
                                     if not choices or choices[0] is None or not isinstance(choices[0], dict):
+                                        if isinstance(data, dict):
+                                            image_urls = []
+                                            image_urls.extend(
+                                                get_image_urls(
+                                                    data,
+                                                    request,
+                                                    metadata,
+                                                    user,
+                                                )
+                                            )
+                                            image_urls.extend(
+                                                get_image_urls(
+                                                    data.get("delta"),
+                                                    request,
+                                                    metadata,
+                                                    user,
+                                                )
+                                            )
+                                            image_urls.extend(
+                                                get_image_urls(
+                                                    data.get("images")
+                                                    or data.get("image")
+                                                    or data.get("image_url")
+                                                    or data.get("files"),
+                                                    request,
+                                                    metadata,
+                                                    user,
+                                                )
+                                            )
+                                            content_value = data.get("content")
+                                            if isinstance(content_value, (list, dict, str)):
+                                                image_urls.extend(
+                                                    get_image_urls(
+                                                        content_value,
+                                                        request,
+                                                        metadata,
+                                                        user,
+                                                    )
+                                                )
+                                            if image_urls:
+                                                seen_urls = set()
+                                                deduped_urls = []
+                                                for url in image_urls:
+                                                    if url and url not in seen_urls:
+                                                        deduped_urls.append(url)
+                                                        seen_urls.add(url)
+                                                message_files = Chats.add_message_files_by_id_and_message_id(
+                                                    metadata["chat_id"],
+                                                    metadata["message_id"],
+                                                    [
+                                                        {"type": "image", "url": url}
+                                                        for url in deduped_urls
+                                                    ],
+                                                )
+                                                await event_emitter(
+                                                    {
+                                                        "type": "files",
+                                                        "data": {"files": message_files},
+                                                    }
+                                                )
+
                                         error = data.get("error", {})
                                         error = _sanitize_error_payload(error)
                                         if error:
@@ -3368,8 +3519,9 @@ async def process_chat_response(
                                             )
                                         continue
 
-                                    delta = choices[0].get("delta", {}) or {}
-                                    message = choices[0].get("message")
+                                    choice = choices[0]
+                                    delta = choice.get("delta", {}) or {}
+                                    message = choice.get("message")
                                     if (
                                         (not delta or (isinstance(delta, dict) and not delta))
                                         and isinstance(message, dict)
@@ -3377,6 +3529,12 @@ async def process_chat_response(
                                         message_content = message.get("content")
                                         message_reasoning = _extract_reasoning_content(message)
                                         message_tool_calls = message.get("tool_calls")
+                                        message_images = (
+                                            message.get("images")
+                                            or message.get("image")
+                                            or message.get("image_url")
+                                        )
+                                        message_files = message.get("files")
                                         delta = {}
                                         if message_content is not None:
                                             delta["content"] = message_content
@@ -3384,6 +3542,10 @@ async def process_chat_response(
                                             delta["reasoning_content"] = message_reasoning
                                         if message_tool_calls:
                                             delta["tool_calls"] = message_tool_calls
+                                        if message_images:
+                                            delta["images"] = message_images
+                                        if message_files:
+                                            delta["files"] = message_files
                                     log.debug(
                                         "[DELTA DEBUG] Received delta keys: %s",
                                         list(delta.keys()),
@@ -3529,10 +3691,89 @@ async def process_chat_response(
                                                 }
                                             )
 
-                                    image_urls = get_image_urls(
-                                        delta.get("images", []), request, metadata, user
+                                    image_urls = []
+                                    image_urls.extend(
+                                        get_image_urls(
+                                            delta.get("images", []),
+                                            request,
+                                            metadata,
+                                            user,
+                                        )
                                     )
+                                    image_urls.extend(
+                                        get_image_urls(
+                                            delta.get("image"),
+                                            request,
+                                            metadata,
+                                            user,
+                                        )
+                                    )
+                                    image_urls.extend(
+                                        get_image_urls(
+                                            delta.get("image_url"),
+                                            request,
+                                            metadata,
+                                            user,
+                                        )
+                                    )
+                                    image_urls.extend(
+                                        get_image_urls(
+                                            delta.get("files"),
+                                            request,
+                                            metadata,
+                                            user,
+                                        )
+                                    )
+                                    choice_images = None
+                                    if isinstance(choice, dict):
+                                        choice_images = (
+                                            choice.get("images")
+                                            or choice.get("image")
+                                            or choice.get("image_url")
+                                            or choice.get("files")
+                                        )
+                                    image_urls.extend(
+                                        get_image_urls(
+                                            choice_images,
+                                            request,
+                                            metadata,
+                                            user,
+                                        )
+                                    )
+                                    if isinstance(message, dict):
+                                        message_images = (
+                                            message.get("images")
+                                            or message.get("image")
+                                            or message.get("image_url")
+                                            or message.get("files")
+                                        )
+                                        image_urls.extend(
+                                            get_image_urls(
+                                                message_images,
+                                                request,
+                                                metadata,
+                                                user,
+                                            )
+                                        )
+                                    content_value = delta.get("content")
+                                    if isinstance(content_value, (list, dict)):
+                                        image_urls.extend(
+                                            get_image_urls(
+                                                content_value,
+                                                request,
+                                                metadata,
+                                                user,
+                                            )
+                                        )
+
                                     if image_urls:
+                                        seen_urls = set()
+                                        deduped_urls = []
+                                        for url in image_urls:
+                                            if url and url not in seen_urls:
+                                                deduped_urls.append(url)
+                                                seen_urls.add(url)
+                                        image_urls = deduped_urls
                                         message_files = Chats.add_message_files_by_id_and_message_id(
                                             metadata["chat_id"],
                                             metadata["message_id"],
@@ -3549,7 +3790,9 @@ async def process_chat_response(
                                             }
                                         )
 
-                                    value = delta.get("content")
+                                    value = content_value
+                                    if isinstance(value, (list, dict)):
+                                        value = _stringify_stream_content(value)
                                     log.debug(
                                         "[DELTA CONTENT DEBUG] content=%s, delta_full=%s",
                                         repr(value)[:200] if value else None,
@@ -3656,6 +3899,55 @@ async def process_chat_response(
                                                 },
                                                 user,
                                             )
+                                        elif isinstance(value, str) and "data:image/" in value:
+                                            base64_images = _extract_base64_images_from_markdown(
+                                                value
+                                            )
+                                            if base64_images:
+                                                image_urls = []
+                                                for base64_image in base64_images:
+                                                    url = get_image_url_from_base64(
+                                                        request,
+                                                        base64_image,
+                                                        {
+                                                            "chat_id": metadata.get(
+                                                                "chat_id", None
+                                                            ),
+                                                            "message_id": metadata.get(
+                                                                "message_id", None
+                                                            ),
+                                                        },
+                                                        user,
+                                                    )
+                                                    if url:
+                                                        image_urls.append(url)
+                                                if image_urls:
+                                                    seen_urls = set()
+                                                    deduped_urls = []
+                                                    for url in image_urls:
+                                                        if url and url not in seen_urls:
+                                                            deduped_urls.append(url)
+                                                            seen_urls.add(url)
+                                                    if deduped_urls:
+                                                        message_files = Chats.add_message_files_by_id_and_message_id(
+                                                            metadata["chat_id"],
+                                                            metadata["message_id"],
+                                                            [
+                                                                {
+                                                                    "type": "image",
+                                                                    "url": url,
+                                                                }
+                                                                for url in deduped_urls
+                                                            ],
+                                                        )
+                                                        await event_emitter(
+                                                            {
+                                                                "type": "files",
+                                                                "data": {
+                                                                    "files": message_files
+                                                                },
+                                                            }
+                                                        )
 
                                         content = f"{content}{value}"
                                         if not content_blocks:

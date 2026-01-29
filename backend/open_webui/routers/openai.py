@@ -564,11 +564,16 @@ def convert_to_responses_payload(chat_payload: dict) -> dict:
     model_name = chat_payload.get("model", "")
     is_reasoning_model = is_openai_reasoning_model(model_name)
 
-    if reasoning_effort:
+    if reasoning_effort and reasoning_effort.lower() != "none":
         # Responses API format: reasoning.effort and reasoning.summary are inside the same object
+        # Only send reasoning object when effort is not "none" (none is not a valid API value)
         reasoning_obj = {"effort": reasoning_effort.lower(), "summary": reasoning_summary}
         responses_payload["reasoning"] = reasoning_obj
         log.info(f"[RESPONSES API] reasoning.effort = {reasoning_effort}, reasoning.summary = {reasoning_summary}")
+
+    elif reasoning_effort and reasoning_effort.lower() == "none":
+        # Explicitly disabled: don't send reasoning object (not sending = no reasoning)
+        log.info(f"[RESPONSES API] reasoning disabled (effort=none), not sending reasoning object")
 
     elif is_reasoning_model:
         # For reasoning models without explicit reasoning_effort, still send summary
@@ -1483,6 +1488,14 @@ THINKING_NOT_SUPPORTED_KEYWORDS = (
     "enable_thinking",
 )
 
+# Keywords that indicate stream_options is not supported by the API
+STREAM_OPTIONS_NOT_SUPPORTED_KEYWORDS = (
+    "stream_options",
+    "streamoptions",
+    "include_usage",
+    "includeusage",
+)
+
 ENABLE_THINKING_SCHEMA_KEYWORDS = (
     "schema",
     "unknown field",
@@ -1503,6 +1516,33 @@ def _is_thinking_not_supported_error(response) -> bool:
     return any(keyword in error_text for keyword in THINKING_NOT_SUPPORTED_KEYWORDS)
 
 
+def _is_stream_options_not_supported_error(response) -> bool:
+    """
+    Check if the error response indicates stream_options is not supported.
+    This helps detect third-party APIs that don't support the stream_options parameter.
+
+    Also returns True for ambiguous 400 errors where we can't parse the response,
+    as this is a common pattern for APIs rejecting unknown parameters.
+    """
+    error_text = _error_text_from_response(response).lower()
+
+    # If we can't extract error text but got a 400, it might be stream_options related
+    # (some APIs return non-JSON error responses when they encounter unknown params)
+    if not error_text:
+        # Check if response is a string that might contain error info
+        if isinstance(response, str):
+            response_lower = response.lower()
+            # Check for stream_options keywords in raw response
+            if any(keyword in response_lower for keyword in STREAM_OPTIONS_NOT_SUPPORTED_KEYWORDS):
+                return True
+            # Check for generic "bad request" patterns that might indicate parameter issues
+            if "bad request" in response_lower or "invalid" in response_lower:
+                return True
+        return False
+
+    return any(keyword in error_text for keyword in STREAM_OPTIONS_NOT_SUPPORTED_KEYWORDS)
+
+
 def _is_enable_thinking_schema_error(response) -> bool:
     """Check if the error response looks like a schema error tied to enable_thinking."""
     error_text = _error_text_from_response(response).lower()
@@ -1515,7 +1555,7 @@ def _is_enable_thinking_schema_error(response) -> bool:
     return False
 
 
-def _extract_sse_error_message(line: bytes) -> Optional[str]:
+def _extract_sse_payload(line: bytes) -> Optional[dict]:
     if not line:
         return None
     if isinstance(line, bytes):
@@ -1530,13 +1570,28 @@ def _extract_sse_error_message(line: bytes) -> Optional[str]:
         return None
 
     try:
-        data = json.loads(payload)
+        return json.loads(payload)
     except Exception:
         return None
 
+
+def _extract_sse_error_message(line: bytes) -> Optional[str]:
+    data = _extract_sse_payload(line)
     if isinstance(data, dict) and "error" in data:
         return _error_text_from_response(data)
     return None
+
+
+def _is_sse_probe_ready_event(payload: dict) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("type") == "heartbeat":
+        return True
+    if payload.get("choices"):
+        return True
+    if payload.get("object") == "chat.completion.chunk":
+        return True
+    return False
 
 
 def _should_compat_retry_stream_error(error_msg: str) -> bool:
@@ -1687,6 +1742,9 @@ async def _probe_stream_for_error(stream_iter, max_lines: int) -> tuple[list[byt
         buffered.append(line)
         error_msg = _extract_sse_error_message(line)
         if error_msg:
+            break
+        payload = _extract_sse_payload(line)
+        if payload and _is_sse_probe_ready_event(payload):
             break
     return buffered, error_msg
 
@@ -2950,12 +3008,17 @@ async def generate_chat_completion(
         # Responses API uses reasoning object format, these params cause errors on some proxies
         log.info("[DEBUG] Responses API detected; skipping thinking flags (uses reasoning object instead)")
     else:
-        # Enable all possible thinking parameter variants for maximum compatibility
-        payload_dict["enable_thinking"] = True
-        payload_dict["include_reasoning"] = True
-        payload_dict["return_reasoning"] = True
-        payload_dict["show_thinking"] = True
-        has_thinking_params = True
+        # Set thinking parameters based on budget
+        # Only enable thinking when budget > 0, explicitly disable when budget = 0
+        if budget > 0:
+            payload_dict["enable_thinking"] = True
+            payload_dict["include_reasoning"] = True
+            payload_dict["return_reasoning"] = True
+            payload_dict["show_thinking"] = True
+            has_thinking_params = True
+        else:
+            # Explicitly disable thinking (for Qwen and other models that need this parameter)
+            payload_dict["enable_thinking"] = False
     # Add Google/Gemini format thinking config (used by various proxies)
     if budget > 0 and use_gemini_thinking:
         thinking_config = {
@@ -3025,10 +3088,12 @@ async def generate_chat_completion(
 
     # Add stream_options with reasoning flags if streaming
     # Skip for Responses API as it doesn't support stream_options parameter
+    # Only add thinking flags when budget > 0
     if payload_dict.get("stream") and not use_gemini_thinking and not use_responses_api:
         stream_opts = payload_dict.get("stream_options", {}) or {}
-        stream_opts["include_reasoning"] = True
-        stream_opts["include_thinking"] = True
+        if budget > 0:
+            stream_opts["include_reasoning"] = True
+            stream_opts["include_thinking"] = True
         payload_dict["stream_options"] = stream_opts
 
     # Optional: inject compat reasoning params for specific proxies/endpoints
@@ -3052,6 +3117,14 @@ async def generate_chat_completion(
             payload_dict["thinking"] = {"effort": effort_value}
         log.debug("[DEBUG] Added reasoning compat modes: %s", compat_modes)
 
+    # Compatibility: Convert "developer" role back to "system" for non-OpenAI APIs
+    # Some third-party proxies/APIs don't support the "developer" role and return empty responses
+    if "api.openai.com" not in url and "messages" in payload_dict:
+        for msg in payload_dict["messages"]:
+            if msg.get("role") == "developer":
+                msg["role"] = "system"
+                log.info("[COMPAT] Converted 'developer' role to 'system' for non-OpenAI API")
+
     payload = json.dumps(payload_dict)
 
     # Debug: print full payload being sent
@@ -3064,7 +3137,9 @@ async def generate_chat_completion(
     retry_without_tools = False
     thinking_fallback_triggered = False  # Track if thinking was disabled during retry
     responses_thinking_fallback_triggered = False  # Track if enable_thinking was removed during retry
+    stream_options_fallback_triggered = False  # Track if stream_options was removed during retry
     responses_enable_thinking_injected = use_responses_api and payload_dict.get("enable_thinking") is True
+    has_stream_options = "stream_options" in payload_dict  # Track if stream_options was injected
 
     try:
         session = aiohttp.ClientSession(
@@ -3171,6 +3246,49 @@ async def generate_chat_completion(
                 else:
                     response = None
                     log.info("[RESPONSES THINKING FALLBACK] Retry succeeded, responses_thinking_fallback_triggered=True")
+
+            # stream_options fallback: retry without stream_options if the API doesn't support it
+            # Many third-party APIs return 400 when they encounter the stream_options parameter
+            if (
+                response is not None
+                and has_stream_options
+                and r.status == 400
+                and _is_stream_options_not_supported_error(response)
+            ):
+                log.warning(
+                    "[STREAM OPTIONS FALLBACK] stream_options not supported (status=%s), retrying without it. Error: %s",
+                    r.status,
+                    _error_text_from_response(response)[:200],
+                )
+                await cleanup_response(r, session)
+
+                payload_dict = copy.deepcopy(payload_dict_base)
+                payload_dict.pop("stream_options", None)
+                has_stream_options = False
+                stream_options_fallback_triggered = True
+                retry_payload = json.dumps(payload_dict)
+
+                session = aiohttp.ClientSession(
+                    trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
+                )
+                r = await session.request(
+                    method="POST",
+                    url=request_url,
+                    data=retry_payload,
+                    headers=headers,
+                    cookies=cookies,
+                    ssl=AIOHTTP_CLIENT_SESSION_SSL,
+                )
+
+                if r.status >= 400:
+                    try:
+                        response = await r.json()
+                    except Exception as e:
+                        log.error(f"Error parsing retry error response: {e}")
+                        response = await r.text()
+                else:
+                    response = None
+                    log.info("[STREAM OPTIONS FALLBACK] Retry succeeded, stream_options_fallback_triggered=True")
 
             # Retry with alternate web search tool types if native web search is enabled
             if (
@@ -3310,7 +3428,51 @@ async def generate_chat_completion(
                         return JSONResponse(status_code=r.status, content=response)
                     else:
                         return PlainTextResponse(status_code=r.status, content=response)
-            elif response:
+
+            # Last resort: try removing stream_options if we still have a 400 error
+            # and haven't tried this fallback yet. This handles APIs that reject
+            # stream_options without a clear error message.
+            if (
+                response is not None
+                and has_stream_options
+                and not stream_options_fallback_triggered
+                and r.status == 400
+            ):
+                log.warning(
+                    "[STREAM OPTIONS FALLBACK - LAST RESORT] Still got 400 error, trying without stream_options. Error: %s",
+                    _error_text_from_response(response)[:200] if response else "N/A",
+                )
+                await cleanup_response(r, session)
+
+                payload_dict = copy.deepcopy(payload_dict_base)
+                payload_dict.pop("stream_options", None)
+                has_stream_options = False
+                stream_options_fallback_triggered = True
+                retry_payload = json.dumps(payload_dict)
+
+                session = aiohttp.ClientSession(
+                    trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
+                )
+                r = await session.request(
+                    method="POST",
+                    url=request_url,
+                    data=retry_payload,
+                    headers=headers,
+                    cookies=cookies,
+                    ssl=AIOHTTP_CLIENT_SESSION_SSL,
+                )
+
+                if r.status >= 400:
+                    try:
+                        response = await r.json()
+                    except Exception as e:
+                        log.error(f"Error parsing last resort retry response: {e}")
+                        response = await r.text()
+                else:
+                    response = None
+                    log.info("[STREAM OPTIONS FALLBACK - LAST RESORT] Retry succeeded!")
+
+            if response:
                 # Not a tool calling error or no tools in payload, handle normally
                 await cleanup_response(r, session)
 
@@ -3473,6 +3635,10 @@ async def generate_chat_completion(
                 for i, line in enumerate(buffered_lines):
                     line_preview = line[:500] if isinstance(line, bytes) else str(line)[:500]
                     log.info(f"[STREAM DEBUG] Buffered line #{i}: {line_preview}")
+                    # Check for image data in buffered lines
+                    line_str = line.decode("utf-8", errors="replace") if isinstance(line, bytes) else str(line)
+                    if "base64" in line_str or "data:image" in line_str:
+                        log.info(f"[STREAM DEBUG] Buffered line #{i} contains image data, length={len(line_str)}")
 
                 for line in buffered_lines:
                     yield line
@@ -3482,6 +3648,10 @@ async def generate_chat_completion(
                     if stream_count <= 5:
                         line_preview = line[:200] if isinstance(line, bytes) else str(line)[:200]
                         log.info(f"[STREAM DEBUG] Line #{stream_count}: {line_preview}")
+                    # Log lines containing base64 image data (for debugging image generation)
+                    line_str = line.decode("utf-8", errors="replace") if isinstance(line, bytes) else str(line)
+                    if "base64" in line_str or "data:image" in line_str:
+                        log.info(f"[STREAM DEBUG] Line #{stream_count} contains image data, length={len(line_str)}")
                     yield line
 
                 log.info(f"[STREAM DEBUG] Stream ended. Buffered lines: {buffered_count}, Stream lines: {stream_count}")

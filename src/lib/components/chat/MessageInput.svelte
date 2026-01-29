@@ -84,6 +84,7 @@
 	import PlusAlt from '../icons/PlusAlt.svelte';
 
 	import CommandSuggestionList from './MessageInput/CommandSuggestionList.svelte';
+	import ReasoningEffortQuick from './MessageInput/ReasoningEffortQuick.svelte';
 	import Knobs from '../icons/Knobs.svelte';
 	import ValvesModal from '../workspace/common/ValvesModal.svelte';
 	import PageEdit from '../icons/PageEdit.svelte';
@@ -1551,6 +1552,11 @@
 											</div>
 										</IntegrationsMenu>
 									{/if}
+
+									<!-- Reasoning Effort Quick Control -->
+									<div class="ml-1">
+										<ReasoningEffortQuick />
+									</div>
 
 									{#if selectedModelIds.length === 1 && $models.find((m) => m.id === selectedModelIds[0])?.has_user_valves}
 										<div class="ml-1 flex gap-1.5">

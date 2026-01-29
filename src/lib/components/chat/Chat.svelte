@@ -141,7 +141,16 @@
 	let codeInterpreterEnabled = false;
 
 	// Context break: message IDs after which to start sending context
-	let contextBreakMessageIds: string[] = [];
+let contextBreakMessageIds: string[] = [];
+const addContextBreak = (id: string) => {
+	if (!id) return;
+	if (!contextBreakMessageIds.includes(id)) {
+		contextBreakMessageIds = [...contextBreakMessageIds, id];
+		if (history) {
+			history.contextBreakMessageIds = contextBreakMessageIds;
+		}
+	}
+};
 
 	let showCommands = false;
 
@@ -1064,10 +1073,11 @@
 		await chatId.set('');
 		await chatTitle.set('');
 
-		history = {
-			messages: {},
-			currentId: null
-		};
+	history = {
+		messages: {},
+		currentId: null,
+		contextBreakMessageIds: []
+	};
 
 		chatFiles = [];
 		params = JSON.parse(JSON.stringify($settings?.params ?? {}));
@@ -1168,6 +1178,9 @@
 					(chatContent?.history ?? undefined) !== undefined
 						? chatContent.history
 						: convertMessagesToHistory(chatContent.messages);
+
+				contextBreakMessageIds = history?.contextBreakMessageIds ?? [];
+				history.contextBreakMessageIds = contextBreakMessageIds;
 
 				chatTitle.set(chatContent.title);
 
@@ -2471,6 +2484,7 @@
 	const saveChatHandler = async (_chatId, history) => {
 		if ($chatId == _chatId) {
 			if (!$temporaryChatEnabled) {
+				history.contextBreakMessageIds = contextBreakMessageIds;
 				chat = await updateChatById(localStorage.token, _chatId, {
 					models: selectedModels,
 					history: history,
@@ -2682,12 +2696,14 @@
 										{mergeResponses}
 										{chatActionHandler}
 										{addMessages}
+										{addContextBreak}
 										topPadding={true}
 										bottomPadding={files.length > 0}
 										{onSelect}
 										{contextBreakMessageIds}
 										onRemoveContextBreak={(id) => {
 											contextBreakMessageIds = contextBreakMessageIds.filter((i) => i !== id);
+											history.contextBreakMessageIds = contextBreakMessageIds;
 										}}
 									/>
 								</div>
@@ -2720,6 +2736,7 @@
 										if (history?.currentId) {
 											if (!contextBreakMessageIds.includes(history.currentId)) {
 												contextBreakMessageIds = [...contextBreakMessageIds, history.currentId];
+												history.contextBreakMessageIds = contextBreakMessageIds;
 											}
 										}
 									}}
