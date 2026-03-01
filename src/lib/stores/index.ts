@@ -65,6 +65,7 @@ export const models: Writable<Model[]> = writable([]);
 export const prompts: Writable<null | Prompt[]> = writable(null);
 export const knowledge: Writable<null | Document[]> = writable(null);
 export const tools = writable(null);
+export const skills = writable(null);
 export const functions = writable(null);
 
 export const toolServers = writable([]);
@@ -301,6 +302,7 @@ type Config = {
 		enable_image_generation: boolean;
 		enable_admin_export: boolean;
 		enable_admin_chat_access: boolean;
+		enable_admin_analytics: boolean;
 		enable_community_sharing: boolean;
 		enable_memories: boolean;
 		enable_autocomplete_generation: boolean;
