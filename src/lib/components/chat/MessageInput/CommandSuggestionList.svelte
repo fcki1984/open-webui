@@ -7,7 +7,6 @@
 	import Prompts from './Commands/Prompts.svelte';
 	import Knowledge from './Commands/Knowledge.svelte';
 	import Models from './Commands/Models.svelte';
-	import Skills from './Commands/Skills.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 
 	import { onMount } from 'svelte';
@@ -134,27 +133,6 @@
 
 							onSelect({
 								type: 'model',
-								data: data
-							});
-						}
-					}}
-				/>
-			{:else if char === '$'}
-				<Skills
-					bind:this={suggestionElement}
-					{query}
-					bind:filteredItems
-					onSelect={(e) => {
-						const { type, data } = e;
-
-						if (type === 'skill') {
-							command({
-								id: `${data.id}|${data.name}`,
-								label: data.name
-							});
-
-							onSelect({
-								type: 'skill',
 								data: data
 							});
 						}
