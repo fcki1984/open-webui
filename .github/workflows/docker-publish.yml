@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ztx888/openwebui
+  IMAGE_NAME: fcki1984/openwebui
 
 jobs:
   build-and-push:
