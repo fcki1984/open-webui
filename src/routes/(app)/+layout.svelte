@@ -173,12 +173,15 @@
 		clearChatInputStorage();
 		await Promise.all([
 			checkLocalDBChats(),
-			setBanners(),
-			setTools(),
-			setFunctions(),
+			setBanners().catch((e) => console.error('Failed to load banners:', e)),
+			setTools().catch((e) => console.error('Failed to load tools:', e)),
+			setFunctions().catch((e) => console.error('Failed to load functions:', e)),
 			setUserSettings(async () => {
-				await Promise.all([setModels(), setToolServers()]);
-			})
+				await Promise.all([
+					setModels().catch((e) => console.error('Failed to load models:', e)),
+					setToolServers().catch((e) => console.error('Failed to load tool servers:', e))
+				]);
+			}).catch((e) => console.error('Failed to load user settings:', e))
 		]);
 
 		// Helper function to check if the pressed keys match the shortcut definition
