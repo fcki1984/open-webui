@@ -405,24 +405,13 @@ def get_filtered_models(models, user, db=None):
 
             model_info = model_infos.get(model["id"], None)
             if model_info:
-                model_owner_id = (
-                    model_info.get("user_id")
-                    if isinstance(model_info, dict)
-                    else getattr(model_info, "user_id", None)
-                )
-                model_access_control = (
-                    model_info.get("access_control", {})
-                    if isinstance(model_info, dict)
-                    else getattr(model_info, "access_control", {})
-                )
-
                 if (
                     (user.role == "admin" and BYPASS_ADMIN_ACCESS_CONTROL)
-                    or user.id == model_owner_id
+                    or user.id == model_info.user_id
                     or has_access(
                         user.id,
                         type="read",
-                        access_control=model_access_control,
+                        access_control=model_info.access_control,
                         user_group_ids=user_group_ids,
                     )
                 ):

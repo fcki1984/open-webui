@@ -1047,13 +1047,12 @@ const addContextBreak = (id: string) => {
 		if (selectedModels.length === 0 || (selectedModels.length === 1 && selectedModels[0] === '')) {
 			if (availableModels.length > 0) {
 				if (defaultModels && defaultModels.length > 0) {
+					// Set from default models
 					selectedModels = defaultModels.filter((modelId) => availableModels.includes(modelId));
 				}
 
-				if (selectedModels.length === 0 || (selectedModels.length === 1 && selectedModels[0] === '')) {
-					// Only fall back to first available model if default models didn't resolve
-					selectedModels = [availableModels?.at(0) ?? ''];
-				}
+				// Set to first available model
+				selectedModels = [availableModels?.at(0) ?? ''];
 			} else {
 				selectedModels = [''];
 			}
@@ -1082,8 +1081,6 @@ const addContextBreak = (id: string) => {
 
 		chatFiles = [];
 		params = JSON.parse(JSON.stringify($settings?.params ?? {}));
-		taskIds = null;
-		messageQueue = [];
 
 		if ($page.url.searchParams.get('youtube')) {
 			await uploadWeb(`https://www.youtube.com/watch?v=${$page.url.searchParams.get('youtube')}`);
@@ -2037,37 +2034,6 @@ const addContextBreak = (id: string) => {
 			}
 		}
 
-		// Parse skill mentions (<$skillId|label>) from user messages
-		const skillMentionRegex = /<\$([^|>]+)\|?[^>]*>/g;
-		const skillIds = [];
-		for (const message of messages) {
-			const content =
-				typeof message.content === 'string' ? message.content : message.content?.[0]?.text ?? '';
-			for (const match of content.matchAll(skillMentionRegex)) {
-				if (!skillIds.includes(match[1])) {
-					skillIds.push(match[1]);
-				}
-			}
-		}
-
-		if (skillIds.length > 0) {
-			messages = messages.map((message) => {
-				if (typeof message.content === 'string') {
-					return { ...message, content: message.content.replace(/<\$[^>]+>/g, '').trim() };
-				} else if (Array.isArray(message.content)) {
-					return {
-						...message,
-						content: message.content.map((part) =>
-							part.type === 'text'
-								? { ...part, text: part.text.replace(/<\$[^>]+>/g, '').trim() }
-								: part
-						)
-					};
-				}
-				return message;
-			});
-		}
-
 		const stopValue = params?.stop ?? $settings?.params?.stop ?? undefined;
 		const stopTokens =
 			typeof stopValue === 'string'
@@ -2076,7 +2042,7 @@ const addContextBreak = (id: string) => {
 					? stopValue
 					: undefined;
 		const stop = stopTokens
-			? stopTokens.map((str) => decodeURIComponent(JSON.parse('"' + str.replace(/\"/g, '\"') + '"')))
+			? stopTokens.map((str) => decodeURIComponent(JSON.parse('"' + str.replace(/\"/g, '\\"') + '"')))
 			: undefined;
 
 		const baseParams = { ...$settings?.params, ...params };
@@ -2100,7 +2066,6 @@ const addContextBreak = (id: string) => {
 
 			filter_ids: selectedFilterIds.length > 0 ? selectedFilterIds : undefined,
 			tool_ids: toolIds.length > 0 ? toolIds : undefined,
-			skill_ids: skillIds.length > 0 ? skillIds : undefined,
 			tool_servers: ($toolServers ?? []).filter(
 				(server, idx) => toolServerIds.includes(idx) || toolServerIds.includes(server?.id)
 			),
